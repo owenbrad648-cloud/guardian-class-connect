@@ -350,4 +350,3 @@ const TeachersManagement = () => {
 };
 
 export default TeachersManagement;
-
