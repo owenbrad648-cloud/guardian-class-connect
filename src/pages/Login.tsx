@@ -20,31 +20,34 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    console.log("--- Running v3 of the handleLogin function ---");
 
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('username', username)
-        .maybeSingle();
-
-      // Prevent username enumeration: always attempt auth with a fallback email
-      const fallbackEmail = `nonexistent+${Math.random().toString(36).slice(2, 8)}@example.com`;
-      const emailToUse = profile?.email ?? fallbackEmail;
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password,
+      const { data, error } = await supabase.functions.invoke("login-with-username", {
+        body: JSON.stringify({ username, password }),
       });
 
       if (error) {
+        console.error("Login function invocation error:", error);
         toast.error('نام کاربری یا رمز عبور اشتباه است');
+      } else if (!data.success) {
+        console.error("Login function returned success:false", data.error);
+        toast.error(data.error || 'یک خطای ناشناخته در سرور رخ داد');
       } else {
-        toast.success('ورود موفقیت‌آمیز بود');
-        navigate('/dashboard');
+        const { session } = data;
+        const { error: setSessionError } = await supabase.auth.setSession(session);
+
+        if (setSessionError) {
+          console.error("Error setting session:", setSessionError);
+          toast.error('خطا در برقراری نشست');
+        } else {
+          toast.success('ورود موفقیت‌آمیز بود');
+          navigate('/dashboard');
+        }
       }
-    } catch (error) {
-      toast.error('خطا در ورود');
+    } catch (error: any) {
+      console.error("An unexpected client-side error occurred during login:", error);
+      toast.error(`خطا در ورود: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -55,20 +58,19 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
             username: username,
-            // The role will be set to 'parent' by default in the trigger if not specified
           },
         },
       });
 
-      if (signUpError) {
-        toast.error(`خطا در ثبت‌نام: ${signUpError.message}`);
+      if (error) {
+        toast.error(`خطا در ثبت‌نام: ${error.message}`);
       } else {
         toast.success('ثبت‌نام موفقیت‌آمیز بود. لطفاً ایمیل خود را برای فعال‌سازی حساب کاربری چک کنید.');
       }
@@ -79,6 +81,7 @@ const Login = () => {
     }
   };
 
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -86,7 +89,7 @@ const Login = () => {
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
             <GraduationCap className="w-9 h-9 text-primary-foreground" />
           </div>
-          <CardTitle className="text-3xl font-bold">سیستم مدیریت هنرستان آل محمد ص</CardTitle>
+          <CardTitle className="text-3xl font-bold">سیستم مدیریت هنرستان امامت</CardTitle>
           <CardDescription>برای ورود به پنل خود، اطلاعات را وارد کنید</CardDescription>
         </CardHeader>
         <CardContent>
@@ -192,4 +195,3 @@ const Login = () => {
 };
 
 export default Login;
-
